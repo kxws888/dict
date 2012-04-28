@@ -131,7 +131,7 @@
                 else {this.assistKeyDefer = capture.assistKey;}
             }
         }
-        else if (e.detail === 2) {
+        else if (e.detail > 1) {
             capture = this.capture[1];
             if (capture.status) {
                 if (e[capture.assistKey]) {this.captureText(e);}
@@ -360,11 +360,15 @@
 
     var dict;
 
+    document.addEventListener('DOMContentLoaded', function () {
+
     chrome.extension.sendRequest({cmd: 'config'}, function (response) {
         dict = new DictSimple({
             skin: response.skin,
             capture: response.capture
         });
     });
+
+    }, false);
 
 })(this, this.document);
