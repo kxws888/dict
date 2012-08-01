@@ -190,7 +190,7 @@
             elems = xml.getElementsByTagName('acceptation');
             for (i = 0, len = elems.length ; i < len ; i += 1) {
                 item = elems[i];
-                elem = item.previousSibling;
+                elem = item.previousSibling.previousSibling;
                 json.tt.push({
                     pos: (elem.tagName.toLowerCase() === 'pos' || elem.tagName.toLowerCase() === 'fe') ? elem.firstChild.nodeValue : '',
                     acceptation: item.firstChild.nodeValue
@@ -331,9 +331,9 @@
     function PowerwordT(args) {
         this.superclass.constructor.call(this, args);
 
-        this.api = 'http://fy.iciba.com/interface.php';
-        this.type = 'post';
-        this.data = 't=auto&content=' + encodeURIComponent(this.word);
+        this.api = 'http://dict-co.iciba.com/api/dictionary.php';
+        this.type = 'get';
+        this.data = 'w=' + encodeURIComponent(this.word);
     }
 
     extend(PowerwordT, Query);
@@ -350,18 +350,18 @@
     function BaiduT(args) {
         this.superclass.constructor.call(this, args);
 
-        this.api = 'http://fanyi.baidu.com/transcontent';
-        this.type = 'post';
-        this.data = 'ie=utf-8&source=txt&t=1319299803844&token=6676e72ea0f1a94a7dc95c52a4c46761&from=auto&to=auto&query=' + encodeURIComponent(this.word);
+        this.api = 'http://openapi.baidu.com/public/2.0/bmt/translate';
+        this.type = 'get';
+        this.data = 'from=auto&to=auto&client_id=r1SFkGlNueMFRf0LUj6VpL55&q=' + encodeURIComponent(this.word);
     }
 
     extend(BaiduT, Query);
 
     BaiduT.prototype.ajaxLoad = function (client) {
         var result = JSON.parse(client.responseText), i, len, item, acceptation = '';
-        if (result.data && result.data.length) {
-            for (i = 0, len = result.data.length ; i < len ; i += 1) {
-                item = result.data[i];
+        if (result.trans_result && result.trans_result.length) {
+            for (i = 0, len = result.trans_result.length ; i < len ; i += 1) {
+                item = result.trans_result[i];
                 acceptation += item.dst;
             }
             this.res.tt = [{pos: '', acceptation: acceptation}];
@@ -429,12 +429,12 @@
         dict: {
             powerword: Powerword,
             bing: Bing,
-            dictcn: Dictcn,
+            dictcn: Powerword,
             qqdict: QQDict
         },
 
         translate: {
-            powerword: PowerwordT,
+            powerword: GoogleT,
             baidu: BaiduT,
             youdao: YoudaoT,
             google: GoogleT
