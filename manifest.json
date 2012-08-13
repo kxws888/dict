@@ -1,6 +1,7 @@
 {
     "name": "易词典",
     "version": "4.6.5",
+    "manifest_version": 2,
     "description": "Chrome下最好用的翻译工具,可取词可划词,支持Google翻译、金山词霸、QQ词典、海词、百度翻译、有道翻译、必应词典",
 
     "icons": {
@@ -25,7 +26,9 @@
         }
     ],
 
-    "background_page": "pages/background.html",
+    "background": {
+        "scripts": ["src/zepto.min.js", "src/oop.js", "src/dictapi.js", "src/background.js"]
+    },
 
     "permissions": [
         "tabs",

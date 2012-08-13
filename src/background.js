@@ -64,6 +64,7 @@
     });
 
     function simpleQuery(key, port, dict, type) {
+        var q = new Query();
         if (dict) {
             if (type === 'dict') {
                 new dictapi.dict[dict]({
@@ -85,8 +86,12 @@
         else {
             if (/^[a-z]+([-'][a-z]+)*$/i.test(key)) {
                 var assistRes, status = 'init';
-                new dictapi.dict[localStorage.mainDict]({
+                q.query({
                     word: key,
+                    api: localStorage.mainDict,
+                    callback: function (result) {
+                        port.postMessage(result);
+                    }/*
                     load: function (json) {
                         status = 'complete';
                         port.postMessage(json);
@@ -99,8 +104,8 @@
                         else {
                             status = 'error';
                         }
-                    }
-                }).query();
+                    }*/
+                });return
 
                 new dictapi.translate[localStorage.translate]({
                     word: key,
@@ -119,12 +124,13 @@
                 }).query();
             }
             else {
-                new dictapi.translate[localStorage.translate]({
+                q.query({
                     word: key,
-                    loadend: function (json) {
-                        port.postMessage(json);
+                    api: localStorage.translate,
+                    callback: function (result) {
+                        port.postMessage(result);
                     }
-                }).query();
+                });
             }
         }
     }

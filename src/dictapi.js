@@ -1,73 +1,4 @@
-(function (window, document, undefined) {
-
-    function ajax(method, url, data, success, error, timeout) {
-        var client = new XMLHttpRequest(), isTimeout = false, isComplete = false;
-        method = method.toLowerCase();
-        if (method === 'get' && data) {
-            url += '?' + data;
-            data = null;
-        }
-        client.onload = function () {
-            if (!isComplete) {
-                if (!isTimeout && ((client.status >= 200 && client.status < 300) || client.status == 304)) {
-                    success(client);
-                }
-                else {
-                    error(client);
-                }
-                isComplete = true;
-            }
-        };
-        client.onerror = function () {
-            if (!isComplete) {
-                error(client);
-                isComplete = true;
-            }
-        };
-        client.open(method, url, true);
-        if (method === 'post') {client.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');}
-        client.setRequestHeader('ajax', 'true');
-        client.send(data);
-        setTimeout(function () {
-            isTimeout = true;
-            if (!isComplete) {
-                client.timeout = true;
-                error(client);
-                isComplete = true;
-            }
-        }, timeout || 2000);
-    }
-
-    function extend(childCtor, parentCtor) {
-        var fnTest = /\bsuperclass\b/, parent = parentCtor.prototype
-        function tempCtor() {};
-        if (parent.superclass && !parent.multiSuperclass) {
-            parent.multiSuperclass = true;
-            for (var name in parent) {
-                if (parent.hasOwnProperty(name) && fnTest.test(parent[name])) {
-                    parent[name] = (function (name, fn) {
-                        return function () {
-                            var bak = this.superclass[name];
-                            this.superclass[name] = parent.superclass[name];
-                            var res = fn.apply(this, arguments);
-                            this.superclass[name] = bak;
-                            return res;
-                        }
-                    })(name, parent[name]);
-                }
-            }
-        }
-        tempCtor.prototype = parent;
-        childCtor.prototype = new tempCtor();
-        childCtor.prototype.superclass = parentCtor.prototype;
-        childCtor.prototype.constructor = childCtor;
-    }
-
-    function proxy(fn, obj) {
-        return function () {
-            return fn.apply(obj, arguments);
-        }
-    }
+(function (exports) {
 
     var database = openDatabase('dict', '1.0', 'dict database', 5 * 1024 * 1024);
     database.transaction(function (tx) {
@@ -77,40 +8,183 @@
         console.log(err)
     });
 
-    function Query(args) {
-        args = args || {};
-        this.word = args.word;
-        this.loadend = args.loadend || function(){};
-        this.load = args.load || function(){};
-        this.error = args.error || function(){};
+    var api = {
+        powerword: {
+            url: 'http://dict-co.iciba.com/api/dictionary.php',
+            data: 'w=?',
+            method: 'get',
+            dataType: 'xml',
+            parse: function (res) {
+                var xml = res, ret = {tt:[]}, element;
+                element = xml.getElementsByTagName('acceptation');
+                if (element.length) {
+                    $.each(element, function (index, item) {
+                        var pos = item.previousSibling.previousSibling;
+                        ret.tt.push({
+                            pos: (pos.tagName.toLowerCase() === 'pos' || pos.tagName.toLowerCase() === 'fe') ? pos.firstChild.nodeValue : '',
+                            acceptation: item.firstChild.nodeValue
+                        });
+                    });
 
-        this.res = {};
-        this.res.key = this.word;
-        this.res.tt = [];
-    }
+                    element = xml.getElementsByTagName('ps')[0];
+                    ret.ps = element ? element.firstChild.nodeValue : '';
 
-    Query.prototype.query = function () {
-        ajax(this.type, this.api, this.data, proxy(this.ajaxLoad, this), proxy(this.ajaxError, this));
-    };
+                    element = xml.getElementsByTagName('pron')[0];
+                    ret.pron = element ? element.firstChild.nodeValue.trim() : '';
 
-    Query.prototype.ajaxLoad = function (client) {
-        if (this.res.tt && this.res.tt.length > 0) {
-            this.load(this.res);
-            this.loadend(this.res);
+                    return ret;
+                }
+            }
+        },
+        bing: {
+            url: 'http://dict.bing.com.cn/io.aspx',
+            data: 't=dict&ut=default&ulang=ZH-CN&tlang=EN-US&q=?',
+            method: 'post',
+            dataType: 'text',
+            parse: function (res) {
+                var ret = {tt:[]}, element;
+                res = JSON.parse(res).ROOT;
+                if (res.DEF) {
+                    ret.ps = res.PROS.PRO ? (res.PROS.PRO.length ? res.PROS.PRO[0].$ : res.PROS.PRO.$) : '';
+
+                    ret.pron = res.AH ? 'http://media.engkoo.com:8129/en-us/' + res.AH.$ + '.mp3' : '';
+
+                    element = res.DEF[0].SENS;
+                    if (element) {
+                        if (!element.length) {element = [element];}
+                        $.each(element, function (index, item) {
+                            var t;
+                            if (item.SEN.length) {
+                                t = [];
+                                for (var i = 0; i < item.SEN.length ; i += 1) {
+                                    t.push(item.SEN[i].D.$);
+                                }
+                                t = t.join(',')
+                            }
+                            else {
+                                t = item.SEN.D.$;
+                            }
+
+                            ret.tt.push({
+                                pos: item.$POS + '.',
+                                acceptation: t
+                            });
+                        });
+                        return ret;
+                    }
+                }
+            }
+        },
+        qqdict: {
+            url: 'http://dict.qq.com/dict',
+            method: 'get',
+            data: 'f=web&q=?',
+            dataType: 'text',
+            parse: function (res) {
+                var ret = {tt: []}, element;
+                res = JSON.parse(res);
+                if (res.local) {
+                    res = res.local[0];
+                    ret.ps = res.pho ? res.pho[0] : '';
+                    ret.pron = res.sd ? 'http://speech.dict.qq.com/audio/' + res.sd.substring(0, 3).split('').join('/') + '/' + res.sd + '.mp3' : '';
+                    element = res.des;
+                    if (element) {
+                        $.each(element, function (index, item){
+                            ret.tt.push({
+                                pos: (item.p ? item.p : ''),
+                                acceptation: item.d
+                            });
+                        });
+                        return ret;
+                    }
+                }
+            }
+        },
+        youdao: {
+            url: 'http://fanyi.youdao.com/translate?smartresult=dict&smartresult=rule&smartresult=ugc&sessionFrom=http://dict.youdao.com/',
+            method: 'post',
+            data: 'type=AUTO&doctype=json&xmlVersion=1.4&keyfrom=fanyi.web&ue=UTF-8&typoResult=true&flag=false&i=?',
+            dataType: 'text',
+            parse: function (res) {
+                var ret = {};
+                res = JSON.parse(res).translateResult;;
+                if (res.length) {
+                    var acceptation = '';
+                    $.each(res, function (index, item) {
+                        acceptation += item[0].tgt;
+                    });
+                    return {tt: [{pos: '', acceptation: acceptation}]};
+                }
+            }
+        },
+        baidu: {
+            url: 'http://openapi.baidu.com/public/2.0/bmt/translate',
+            method: 'get',
+            data: 'from=auto&to=auto&client_id=r1SFkGlNueMFRf0LUj6VpL55&q=?',
+            dataType: 'text',
+            parse: function (res) {
+                res = JSON.parse(res);
+                var acceptation = '';
+                if (res.trans_result && res.trans_result.length) {
+                    $.each(res.trans_result, function (index, item) {
+                        acceptation += item.dst;
+                    });
+                    return {tt: [{pos: '', acceptation: acceptation}]};
+                }
+            }
+        },
+        google: {
+            url: 'http://translate.google.com/translate_a/t',
+            method: 'get',
+            data: 'client=t&hl=zh-CN&sl=auto&tl=auto&text=?',
+            dataType: 'text',
+            parse: function (res) {
+                var acceptation = '';
+                console.log(res)
+                res = res.match(/^\[{3}(.+?)\]{2},,/)[1].split('],[');
+                $.each(res, function (index, item){
+                    acceptation += item.split(',')[0].slice(1, -1);
+                });
+                return {tt: [{pos: '', acceptation: acceptation}]};
+            }
         }
-        else {
-            this.ajaxError();
+    };
+
+    exports.Query = Class(api, {
+
+        init: function (args) {
+
+        },
+
+        query: function (options) {
+            var self = this,
+                word = options.word,
+                api = options.api,
+                callback = options.callback;
+
+            $.ajax({
+                url: self[api].url,
+                method: self[api].type,
+                data: self[api].data.replace('?', encodeURIComponent(word)),
+                dataType: self[api].dataType,
+                success: function (response) {
+                    var result = self[api].parse(response);
+                    if (result) {
+                        result.key = word;
+                        callback(result);
+                    }
+                    else {
+                        callback({key: word, tt: [{pos: '', acceptation: '查询不到结果'}]});
+                    }
+                },
+                error: function (response) {console.log(response)
+                    callback({key: word, tt: [{pos: '', acceptation: '出错了!'}]});
+                }
+            });
         }
-    };
 
-    Query.prototype.ajaxError = function (client) {
-        this.res = {};
-        this.res.key = this.word;
-        this.res.tt = [{pos: '', acceptation: '查询不到结果'}];
-        this.error(this.res);
-        this.loadend(this.res);
-    };
-
+    });
+/*
 
 
 
@@ -133,10 +207,7 @@
                 else {
                     ajax(self.type, self.api, self.data, proxy(self.ajaxLoad, self), proxy(self.ajaxError, self));
                 }
-            });/*, function (tx, err) {
-                console.log('selct error', arguments);
-                ajax(self.type, self.api, self.data, proxy(self.ajaxLoad, self), proxy(self.ajaxError, self));
-            }*/
+            });
         });
     };
 
@@ -163,281 +234,5 @@
         }
     };
 
-
-
-
-    function Powerword(args) {
-
-        this.superclass.constructor.call(this, args);
-
-        this.api = 'http://dict-co.iciba.com/api/dictionary.php';
-        this.type = 'get';
-        this.data = 'w=' + this.word;
-        this.model = 'powerword';
-    }
-
-    extend(Powerword, Dict);
-
-    Powerword.prototype.ajaxLoad = function (client) {
-        var xml = client.responseXML, json = this.res, elems, elem, i, len, item;
-        if (xml) {
-            elems = xml.getElementsByTagName('ps')[0];
-            json.ps = elems ? elems.firstChild.nodeValue : '';
-
-            elems = xml.getElementsByTagName('pron')[0];
-            json.pron = elems ? elems.firstChild.nodeValue.trim() : '';
-
-            elems = xml.getElementsByTagName('acceptation');
-            for (i = 0, len = elems.length ; i < len ; i += 1) {
-                item = elems[i];
-                elem = item.previousSibling.previousSibling;
-                json.tt.push({
-                    pos: (elem.tagName.toLowerCase() === 'pos' || elem.tagName.toLowerCase() === 'fe') ? elem.firstChild.nodeValue : '',
-                    acceptation: item.firstChild.nodeValue
-                });
-            }
-        }
-
-        this.superclass.ajaxLoad.call(this, client);
-    };
-
-
-    function Dictcn(args) {
-
-        this.superclass.constructor.call(this, args);
-
-        this.api = 'http://dict.cn/ws.php';
-        this.type = 'get';
-        this.data = 'utf8=true&q=' + this.word;
-        this.model = 'dictcn';
-    }
-
-    extend(Dictcn, Dict);
-
-    Dictcn.prototype.ajaxLoad = function (client) {
-        var xml = client.responseText, json = this.res, elems, elem, i, len, item, parser, reg = /[a-z]\..+?(?=[a-z]\.|$)/gm, reg2 = /^[a-z]+?\./i;
-        if (xml) {
-            parser = new DOMParser();
-            xml = parser.parseFromString(xml,"text/xml");
-            elem = xml.getElementsByTagName('pron')[0];
-            json.ps = elem ? elem.firstChild.nodeValue : '';
-
-            elem = xml.getElementsByTagName('audio')[0];
-            json.pron = elem ? elem.firstChild.nodeValue : '';
-
-            elem = xml.getElementsByTagName('def')[0];
-            if (elem) {
-                elems = elem.firstChild.nodeValue.split('\n');
-                if (elems) {
-                    for (i = 0, len = elems.length ; i < len ; i += 1) {
-                        json.tt.push({
-                            pos: '',
-                            acceptation: elems[i].replace(reg2, function (str) {
-                                return '<span>' + str + '</span>';
-                            })
-                        });
-                    }
-                }
-            }
-        }
-
-        this.superclass.ajaxLoad.call(this, client);
-    };
-
-
-    function QQDict(args) {
-
-        this.superclass.constructor.call(this, args);
-
-        this.api = 'http://dict.qq.com/dict';
-        this.type = 'get';
-        this.data = 'f=web&q=' + this.word;
-        this.model = 'qqdict';
-    }
-
-    extend(QQDict, Dict);
-
-    QQDict.prototype.ajaxLoad = function (client) {
-        var xml = JSON.parse(client.responseText), json = this.res, elems, elem, i, len, item;//eval('(' + client.responseText + ')')
-        if (xml.local) {
-            xml = xml.local[0];
-            json.ps = xml.pho ? xml.pho[0] : '';
-
-            json.pron = xml.sd ? 'http://speech.dict.qq.com/audio/' + xml.sd.substring(0, 3).split('').join('/') + '/' + xml.sd + '.mp3' : '';
-
-            elems = xml.des;
-            if (elems) {
-                for (i = 0, len = elems.length ; i < len ; i += 1) {
-                    item = elems[i];
-                    json.tt.push({
-                        pos: (item.p ? item.p : ''),
-                        acceptation: item.d
-                    });
-                }
-            }
-        }
-
-        this.superclass.ajaxLoad.call(this, client);
-    };
-
-
-    function Bing(args) {
-
-        this.superclass.constructor.call(this, args);
-
-        this.api = 'http://dict.bing.com.cn/io.aspx';
-        this.type = 'post';
-        this.data = 't=dict&ut=default&ulang=ZH-CN&tlang=EN-US&q=' + this.word;
-        this.model = 'bing';
-    }
-
-    extend(Bing, Dict);
-
-    Bing.prototype.ajaxLoad = function (client) {
-        var xml = JSON.parse(client.responseText).ROOT, json = this.res, elems, elem, i, len, j, jLen, item, t;
-        if (xml.DEF) {
-            json.ps = xml.PROS.PRO ? (xml.PROS.PRO.length ? xml.PROS.PRO[0].$ : xml.PROS.PRO.$) : '';
-
-            json.pron = xml.AH ? 'http://media.engkoo.com:8129/en-us/' + xml.AH.$ + '.mp3' : '';
-
-            elems = xml.DEF[0].SENS;
-            if (elems) {
-                if (!elems.length) {elems = [elems]}
-                for (i = 0, len = elems.length ; i < len ; i += 1) {
-                    item = elems[i];
-                    if (item.SEN.length) {
-                        t = [];
-                        for (j = 0, jLen = item.SEN.length ; j < jLen ; j += 1) {
-                            t.push(item.SEN[j].D.$);
-                        }
-                        t = t.join(',')
-                    }
-                    else {
-                        t = item.SEN.D.$;
-                    }
-
-                    json.tt.push({
-                        pos: item.$POS + '.',
-                        acceptation: t
-                    });
-                }
-            }
-        }
-
-        this.superclass.ajaxLoad.call(this, client);
-    }
-
-
-    function PowerwordT(args) {
-        this.superclass.constructor.call(this, args);
-
-        this.api = 'http://dict-co.iciba.com/api/dictionary.php';
-        this.type = 'get';
-        this.data = 'w=' + encodeURIComponent(this.word);
-    }
-
-    extend(PowerwordT, Query);
-
-    PowerwordT.prototype.ajaxLoad = function (client) {
-        var result = client.responseText;
-        if (result) {
-            this.res.tt = [{pos: '', acceptation: result}];
-        }
-        this.superclass.ajaxLoad.call(this, client);
-    }
-
-
-    function BaiduT(args) {
-        this.superclass.constructor.call(this, args);
-
-        this.api = 'http://openapi.baidu.com/public/2.0/bmt/translate';
-        this.type = 'get';
-        this.data = 'from=auto&to=auto&client_id=r1SFkGlNueMFRf0LUj6VpL55&q=' + encodeURIComponent(this.word);
-    }
-
-    extend(BaiduT, Query);
-
-    BaiduT.prototype.ajaxLoad = function (client) {
-        var result = JSON.parse(client.responseText), i, len, item, acceptation = '';
-        if (result.trans_result && result.trans_result.length) {
-            for (i = 0, len = result.trans_result.length ; i < len ; i += 1) {
-                item = result.trans_result[i];
-                acceptation += item.dst;
-            }
-            this.res.tt = [{pos: '', acceptation: acceptation}];
-        }
-        this.superclass.ajaxLoad.call(this, client);
-    }
-
-    function YoudaoT(args) {
-        this.superclass.constructor.call(this, args);
-
-        this.api = 'http://fanyi.youdao.com/translate?smartresult=dict&smartresult=rule&smartresult=ugc&sessionFrom=http://dict.youdao.com/';
-        this.type = 'post';
-        this.data = 'type=AUTO&doctype=json&xmlVersion=1.4&keyfrom=fanyi.web&ue=UTF-8&typoResult=true&flag=false&i=' + encodeURIComponent(this.word);
-    }
-
-    extend(YoudaoT, Query);
-
-    YoudaoT.prototype.ajaxLoad = function (client) {
-        var result = JSON.parse(client.responseText).translateResult, i, len, acceptation = '';
-        if (result.length) {
-            for (i = 0, len = result.length ; i < len ; i += 1) {
-                acceptation += result[i][0].tgt
-            }
-            this.res.tt = [{pos: '', acceptation: acceptation}];
-        }
-        this.superclass.ajaxLoad.call(this, client);
-    }
-
-
-    function GoogleT(args) {
-        this.superclass.constructor.call(this, args);
-
-        var zh =/[\u4e00-\u9fa5]/.test(this.word), sl, tl;
-        if (zh) {
-            sl = 'zh-CN';
-            tl = 'en';
-        }
-        else {
-            sl = 'en';
-            tl = 'zh-CN';
-        }
-
-        this.api = 'http://translate.google.com/translate_a/t';
-        this.type = 'get';
-        this.data = 'client=t&hl=zh-CN&sl='+sl+'&tl='+tl+'&text=' + encodeURIComponent(this.word);
-    }
-
-    extend(GoogleT, Query);
-
-    GoogleT.prototype.ajaxLoad = function (client) {
-        var result = client.responseText, i, len, item, acceptation = '';
-        result = eval('(' + result + ')');
-        if (result[0]) {
-            for (i = 0, len = result[0].length ; i < len ; i += 1) {
-                item = result[0][i];
-                acceptation += item[0];
-            }
-            this.res.tt = [{pos: '', acceptation: acceptation}];
-        }
-        this.superclass.ajaxLoad.call(this, client);
-    }
-
-
-    window.dictapi = {
-        dict: {
-            powerword: Powerword,
-            bing: Bing,
-            dictcn: Powerword,
-            qqdict: QQDict
-        },
-
-        translate: {
-            powerword: GoogleT,
-            baidu: BaiduT,
-            youdao: YoudaoT,
-            google: GoogleT
-        }
-    }
-})(this, this.document);
+    */
+})(this);
