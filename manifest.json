@@ -1,8 +1,8 @@
 {
     "name": "易词典",
-    "version": "4.6.5",
+    "version": "5.0.1",
     "manifest_version": 2,
-    "description": "Chrome下最好用的翻译工具,可取词可划词,支持Google翻译、金山词霸、QQ词典、海词、百度翻译、有道翻译、必应词典",
+    "description": "Chrome下最好用的翻译工具,可取词可划词,支持金山词霸、QQ词典、必应词典、百度翻译、有道翻译、Google翻译",
 
     "icons": {
         "16": "assets/normal.png",
@@ -33,9 +33,17 @@
     "permissions": [
         "tabs",
         "contextMenus",
-        "*://*/*",
-        "file:///*"
+        "*://*/*"
     ],
+
+    "web_accessible_resources": [
+        "assets/powerword.png",
+        "assets/bing.png",
+        "assets/qqdict.png",
+        "assets/google.png",
+        "assets/baidu.png",
+        "assets/youdao.png"
+      ],
 
     "options_page": "pages/options.html"
 }

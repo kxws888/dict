@@ -276,7 +276,7 @@
     };
 
     DictSimple.prototype.show = function (data) {
-        var i, len, str = '';
+        var i, len, str = '', self = this;
         if (data.key === this.text) {
             if (!this.node && window.getSelection().toString().trim() !== this.text) {
                 this.text = '';
@@ -289,7 +289,10 @@
             this.ui = document.createElement('aside');
             this.ui.id = 'dict-viclm-simple';
             this.ui.className = this.skin;
-            str += '<header><h1>' + data.key + '</h1>';
+            str += '<header>';
+            if (data.type === 'dict') {
+                str += '<h1>' + data.key + '</h1>';
+            }
             if (data.ps) {
                 str += '<span>[ ' + data.ps + ' ]</span>';
             }
@@ -300,6 +303,11 @@
             for (i = 0, len = data.tt.length ; i < len ; i += 1) {
                 str += '<p><span>' + data.tt[i].pos + '</span> ' + data.tt[i].acceptation + '</p>';
             }
+            str += '<footer>';
+            for (i = 0, len = data.dicts.length ; i < len ; i += 1) {
+                str += '<a href="" data-api="' + data.dicts[i] + '" style="background:url('+chrome.extension.getURL('assets/'+data.dicts[i]+'.png')+')"></a>';
+            }
+            str += '</footer>';
             str += '<div class="down"></div>';
 
             this.ui.innerHTML = str;
@@ -310,6 +318,10 @@
             this.ui.addEventListener('keyup', this.eventClear, false);
             delegate(this.ui, 'img', 'click', function () {
                 this.nextSibling.play();
+            });
+            delegate(this.ui, 'footer a', 'click', function (e) {
+                self.port.postMessage({cmd: 'query', w: data.key, dict: e.target.dataset.api});
+                e.preventDefault();
             });
             this.position();
         }

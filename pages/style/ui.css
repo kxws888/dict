@@ -48,7 +48,7 @@
 }
 
 #dict-viclm-simple {
-    font-family: Arial, 'Microsoft Yahei', Simsun, sans-serif;
+    font-family: 'Microsoft Yahei', Arial, sans-serif, Simsun;
     font-size: 12px;
     line-height: 18px;
     position: absolute;
@@ -57,10 +57,11 @@
     z-index: 19860208;
     border-radius:5px;
     max-width: 350px;
+    box-shadow:0 0 10px #333;
 }
 
 #dict-viclm-simple header {
-    margin-bottom: 1px;
+    margin-bottom: 5px;
 }
 
 #dict-viclm-simple h1 {
@@ -88,6 +89,24 @@
 
 #dict-viclm-simple span {
     color: grey;
+}
+
+#dict-viclm-simple footer{
+    overflow:hidden;
+    margin-top: 5px;
+}
+#dict-viclm-simple footer a{
+    width:16px;
+    height:16px;
+    display:block;
+    float:left;
+    margin-right:2px;
+}
+
+#dict-viclm-simple footer a:first-child{
+    width:14px;
+    height:14px;
+    border:1px solid #333;
 }
 
 /* creates triangle */

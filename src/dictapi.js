@@ -8,8 +8,9 @@
         console.log(err)
     });
 
-    var api = {
+    var API = {
         powerword: {
+            type: 'dict',
             url: 'http://dict-co.iciba.com/api/dictionary.php',
             data: 'w=?',
             method: 'get',
@@ -37,6 +38,7 @@
             }
         },
         bing: {
+            type: 'dict',
             url: 'http://dict.bing.com.cn/io.aspx',
             data: 't=dict&ut=default&ulang=ZH-CN&tlang=EN-US&q=?',
             method: 'post',
@@ -76,6 +78,7 @@
             }
         },
         qqdict: {
+            type: 'dict',
             url: 'http://dict.qq.com/dict',
             method: 'get',
             data: 'f=web&q=?',
@@ -101,6 +104,7 @@
             }
         },
         youdao: {
+            type: 'translate',
             url: 'http://fanyi.youdao.com/translate?smartresult=dict&smartresult=rule&smartresult=ugc&sessionFrom=http://dict.youdao.com/',
             method: 'post',
             data: 'type=AUTO&doctype=json&xmlVersion=1.4&keyfrom=fanyi.web&ue=UTF-8&typoResult=true&flag=false&i=?',
@@ -118,6 +122,7 @@
             }
         },
         baidu: {
+            type: 'translate',
             url: 'http://openapi.baidu.com/public/2.0/bmt/translate',
             method: 'get',
             data: 'from=auto&to=auto&client_id=r1SFkGlNueMFRf0LUj6VpL55&q=?',
@@ -134,13 +139,13 @@
             }
         },
         google: {
+            type: 'translate',
             url: 'http://translate.google.com/translate_a/t',
             method: 'get',
             data: 'client=t&hl=zh-CN&sl=auto&tl=auto&text=?',
             dataType: 'text',
             parse: function (res) {
                 var acceptation = '';
-                console.log(res)
                 res = res.match(/^\[{3}(.+?)\]{2},,/)[1].split('],[');
                 $.each(res, function (index, item){
                     acceptation += item.split(',')[0].slice(1, -1);
@@ -150,7 +155,7 @@
         }
     };
 
-    exports.Query = Class(api, {
+    exports.Query = Class(API, {
 
         init: function (args) {
 
@@ -168,17 +173,34 @@
                 data: self[api].data.replace('?', encodeURIComponent(word)),
                 dataType: self[api].dataType,
                 success: function (response) {
-                    var result = self[api].parse(response);
+                    var result = self[api].parse(response), dicts = [];
+                    for (var key in API) {
+                        if (API[key].type === self[api].type) {
+                            dicts.push(key);
+                        }
+                    }
+                    dicts.splice(dicts.indexOf(api), 1);
+                    dicts.unshift(api);
                     if (result) {
                         result.key = word;
+                        result.dicts = dicts;
+                        result.type = self[api].type;
                         callback(result);
                     }
                     else {
-                        callback({key: word, tt: [{pos: '', acceptation: '查询不到结果'}]});
+                        callback({key: word, dicts: dicts, type: self[api].type, tt: [{pos: '', acceptation: '查询不到结果'}]});
                     }
                 },
                 error: function (response) {console.log(response)
-                    callback({key: word, tt: [{pos: '', acceptation: '出错了!'}]});
+                    var dicts = [];
+                    for (var key in API) {
+                        if (API[key].type === self[api].type) {
+                            dicts.push(key);
+                        }
+                    }
+                    dicts.splice(dicts.indexOf(api), 1);
+                    dicts.unshift(api);
+                    callback({key: word, dicts: dicts, type: self[api].type, tt: [{pos: '', acceptation: '出错了!'}]});
                 }
             });
         }

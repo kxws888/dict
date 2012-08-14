@@ -65,74 +65,16 @@
 
     function simpleQuery(key, port, dict, type) {
         var q = new Query();
-        if (dict) {
-            if (type === 'dict') {
-                new dictapi.dict[dict]({
-                    word: key,
-                    loadend: function (json) {
-                        port.postMessage(json);
-                    }
-                }).query();
-            }
-            else {
-                new dictapi.translate[dict]({
-                    word: key,
-                    loadend: function (json) {
-                        port.postMessage(json);
-                    }
-                }).query();
-            }
+        if (dict === undefined) {
+            dict = /^[a-z]+([-'][a-z]+)*$/i.test(key) ? localStorage.mainDict : localStorage.translate;
         }
-        else {
-            if (/^[a-z]+([-'][a-z]+)*$/i.test(key)) {
-                var assistRes, status = 'init';
-                q.query({
-                    word: key,
-                    api: localStorage.mainDict,
-                    callback: function (result) {
-                        port.postMessage(result);
-                    }/*
-                    load: function (json) {
-                        status = 'complete';
-                        port.postMessage(json);
-                    },
-                    error: function (json) {
-                        if (assistRes) {
-                            port.postMessage(assistRes);
-                            status = 'complete';
-                        }
-                        else {
-                            status = 'error';
-                        }
-                    }*/
-                });return
-
-                new dictapi.translate[localStorage.translate]({
-                    word: key,
-                    load: function (json) {
-                        assistRes = json;
-                        if (status === 'error') {
-                            port.postMessage(json);
-                        }
-                    },
-                    error: function (json) {
-                        assistRes = json;
-                        if (status === 'error') {
-                            port.postMessage(json);
-                        }
-                    }
-                }).query();
+        q.query({
+            word: key,
+            api: dict,
+            callback: function (result) {
+                port.postMessage(result);
             }
-            else {
-                q.query({
-                    word: key,
-                    api: localStorage.translate,
-                    callback: function (result) {
-                        port.postMessage(result);
-                    }
-                });
-            }
-        }
+        });
     }
 
 })(this, this.document);
